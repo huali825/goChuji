@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 const (
@@ -105,6 +107,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 	}
 	var req Req
 	if err := ctx.Bind(&req); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
 	u, err := h.svc.Login(ctx, req.Email, req.Password)
@@ -133,7 +136,51 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 }
 
 func (h *UserHandler) Edit(ctx *gin.Context) {
-	//todo
+	//{"nickname":"huali","birthday":"2025-07-28","aboutMe":"sdfsfdfsfdfsdghhhh"}
+	sess := sessions.Default(ctx)
+	// 如果 session 中没有 userId，则表示用户未登录
+	if sess.Get("userId") == nil {
+		// 中断，不要往后执行，也就是不要执行后面的业务逻辑
+		ctx.String(http.StatusOK, "用户未登录")
+		return
+	}
+	userIDAnyBtIsInt64 := sess.Get("userId")
+
+	// 从上下文中获取用户ID
+	//userID, exists := ctx.Get("user_id")
+	//if !exists {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": "无法获取用户信息"})
+	//	return
+	//}
+
+	userIDInt64, ok := userIDAnyBtIsInt64.(int64)
+	if !ok {
+		// 处理类型不匹配的情况
+		ctx.String(http.StatusOK, "系统错误")
+		log.Fatal("类型断言失败：puserID2 不是 int64 类型")
+	}
+	userIDStr := strconv.FormatInt(userIDInt64, 10)
+
+	//处理传入的json
+	type Req struct {
+		Nickname string `json:"nickname"`
+		Birthday string `json:"birthday"`
+		AboutMe  string `json:"aboutMe"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	u, err := h.svc.Edit(ctx, userIDStr, req.Nickname, req.Birthday, req.AboutMe)
+	fmt.Println(u, time.Now())
+	switch err {
+	case nil:
+		ctx.String(http.StatusOK, "")
+	default:
+		ctx.String(http.StatusOK, "系统错误")
+	}
 }
 
 func (h *UserHandler) Profile(ctx *gin.Context) {

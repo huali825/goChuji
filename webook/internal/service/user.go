@@ -59,3 +59,11 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 func (svc *UserService) FindByID(ctx *gin.Context, userIDStr string) (domain.User, error) {
 	return svc.repo.FindByID(ctx, userIDStr)
 }
+
+func (svc *UserService) Edit(ctx *gin.Context, userIDStr string, nickname string, birthday string, AboutMe string) (domain.User, error) {
+	_, err := svc.FindByID(ctx, userIDStr)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return svc.repo.Edit(ctx, userIDStr, nickname, birthday, AboutMe)
+}

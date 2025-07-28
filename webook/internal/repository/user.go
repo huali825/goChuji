@@ -56,3 +56,11 @@ func (repo *UserRepository) FindByID(ctx *gin.Context, userIDStr string) (domain
 	}
 	return repo.toDomain(u), nil
 }
+
+func (repo *UserRepository) Edit(ctx *gin.Context, userIDStr string, nickname string, birthday string, AboutMe string) (domain.User, error) {
+	u, err := repo.dao.Edit(ctx, userIDStr, nickname, birthday, AboutMe)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return repo.toDomain(u), nil
+}

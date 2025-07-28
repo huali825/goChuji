@@ -51,6 +51,24 @@ func (dao *UserDAO) FindByID(ctx *gin.Context, userIDStr string) (User, error) {
 	return u, err
 }
 
+func (dao *UserDAO) Edit(ctx *gin.Context, userIDStr string, nickname string, birthday string, AboutMe string) (User, error) {
+	// 定义一个User类型的变量u
+	var u User
+	// 使用dao.db.WithContext(ctx)方法，传入上下文ctx，并使用Where方法，传入id=?，查询id等于userIDStr的User
+	err := dao.db.WithContext(ctx).Where("id=?", userIDStr).Updates(User{
+		// 更新User的Nickname字段为nickname
+		Nickname: nickname,
+		// 更新User的Birthday字段为birthday
+		Birthday: birthday,
+		// 更新User的AboutMe字段为AboutMe
+		AboutMe: AboutMe,
+	}).Error
+
+	u, err = dao.FindByID(ctx, userIDStr)
+	// 返回User类型的变量u和错误信息err
+	return u, err
+}
+
 type User struct {
 	//Id       int64  `gorm:"primaryKey,autoIncrement"`
 	//Email    string `gorm:"unique"`
