@@ -6,7 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"gochuji/webook/internal/domain"
 	"gochuji/webook/internal/service"
+	"log"
 	"net/http"
+	"strconv"
 )
 
 const (
@@ -131,9 +133,58 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 }
 
 func (h *UserHandler) Edit(ctx *gin.Context) {
-
+	//todo
 }
 
 func (h *UserHandler) Profile(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "这是 profile")
+
+	// 获取 session
+	sess := sessions.Default(ctx)
+	// 如果 session 中没有 userId，则表示用户未登录
+	if sess.Get("userId") == nil {
+		// 中断，不要往后执行，也就是不要执行后面的业务逻辑
+		ctx.String(http.StatusOK, "用户未登录")
+		return
+	}
+	userIDAnyBtIsInt64 := sess.Get("userId")
+
+	// 从上下文中获取用户ID
+	//userID, exists := ctx.Get("user_id")
+	//if !exists {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": "无法获取用户信息"})
+	//	return
+	//}
+
+	userIDInt64, ok := userIDAnyBtIsInt64.(int64)
+	if !ok {
+		// 处理类型不匹配的情况
+		ctx.String(http.StatusOK, "系统错误")
+		log.Fatal("类型断言失败：puserID2 不是 int64 类型")
+	}
+	userIDStr := strconv.FormatInt(userIDInt64, 10)
+
+	// 从数据库获取用户信息
+	u, err := h.svc.FindByID(ctx, userIDStr)
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "无法获取用户信息")
+	}
+
+	profile := &Profile{
+		Email:    u.Email,
+		Phone:    u.Phone,
+		Nickname: u.Nickname,
+		Birthday: u.Birthday,
+		AboutMe:  u.AboutMe,
+	}
+
+	// 返回JSON响应
+	ctx.JSON(http.StatusOK, profile)
+}
+
+type Profile struct {
+	Email    string `json:"Email"`
+	Phone    string `json:"Phone"`
+	Nickname string `json:"Nickname"`
+	Birthday string `json:"Birthday"`
+	AboutMe  string `json:"AboutMe"`
 }

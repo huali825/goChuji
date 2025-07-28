@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"github.com/gin-gonic/gin"
 	"gochuji/webook/internal/domain"
 	"gochuji/webook/internal/repository/dao"
 )
@@ -41,5 +42,17 @@ func (repo *UserRepository) toDomain(u dao.User) domain.User {
 		Id:       u.Id,
 		Email:    u.Email,
 		Password: u.Password,
+		Phone:    u.Phone,
+		Nickname: u.Nickname,
+		Birthday: u.Birthday,
+		AboutMe:  u.AboutMe,
 	}
+}
+
+func (repo *UserRepository) FindByID(ctx *gin.Context, userIDStr string) (domain.User, error) {
+	u, err := repo.dao.FindByID(ctx, userIDStr)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return repo.toDomain(u), nil
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"gochuji/webook/internal/domain"
 	"gochuji/webook/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -53,4 +54,8 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 	}
 	// 返回用户
 	return u, nil
+}
+
+func (svc *UserService) FindByID(ctx *gin.Context, userIDStr string) (domain.User, error) {
+	return svc.repo.FindByID(ctx, userIDStr)
 }

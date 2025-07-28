@@ -10,6 +10,11 @@ type User struct {
 	// UTC 0 的时区
 	Ctime time.Time
 
+	Phone    string
+	Nickname string
+	Birthday string
+	AboutMe  string
+
 	//Addr Address
 }
 
