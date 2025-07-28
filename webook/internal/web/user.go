@@ -108,8 +108,11 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 	u, err := h.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
+		// 获取当前会话
 		sess := sessions.Default(ctx)
+		// 设置会话中的userId为u.Id
 		sess.Set("userId", u.Id)
+		// 设置会话的选项
 		sess.Options(sessions.Options{
 			// 十五分钟
 			MaxAge: 900,

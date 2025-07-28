@@ -1,19 +1,21 @@
 package main
 
 import (
+	"strings"
+	"time"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+
 	"gochuji/webook/internal/repository"
 	"gochuji/webook/internal/repository/dao"
 	"gochuji/webook/internal/service"
 	"gochuji/webook/internal/web"
 	"gochuji/webook/internal/web/middleware"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	"strings"
-	"time"
 )
 
 func main() {
@@ -51,23 +53,24 @@ func initUserHdl(db *gorm.DB, server *gin.Engine) {
 func initWebServer() *gin.Engine {
 	server := gin.Default()
 
-	server.Use(cors.New(cors.Config{
-		//AllowAllOrigins:  true,                              //允许所有来源
-		//AllowOrigins:     []string{"http://localhost:3000"}, //允许跨域请求的域名
-		AllowCredentials: true,                     //允许跨域请求携带cookie
-		AllowHeaders:     []string{"Content-Type"}, //允许跨域请求携带的header
-		//AllowMethods: []string{"POST"},				//允许跨域请求的方法
+	server.Use(
+		cors.New(cors.Config{
+			//AllowAllOrigins:  true,                              //允许所有来源
+			//AllowOrigins:     []string{"http://localhost:3000"}, //允许跨域请求的域名
+			AllowCredentials: true,                     //允许跨域请求携带cookie
+			AllowHeaders:     []string{"Content-Type"}, //允许跨域请求携带的header
+			//AllowMethods: []string{"POST"},				//允许跨域请求的方法
 
-		//自定义的校验规则
-		AllowOriginFunc: func(origin string) bool {
-			if strings.HasPrefix(origin, "http://localhost") {
-				//if strings.Contains(origin, "localhost") {
-				return true
-			}
-			return strings.Contains(origin, "your_company.com")
-		},
-		MaxAge: 12 * time.Hour,
-	}),
+			//自定义的校验规则
+			AllowOriginFunc: func(origin string) bool {
+				if strings.HasPrefix(origin, "http://localhost") {
+					//if strings.Contains(origin, "localhost") {
+					return true
+				}
+				return strings.Contains(origin, "your_company.com")
+			},
+			MaxAge: 12 * time.Hour,
+		}),
 		func(ctx *gin.Context) {
 			println("这是我的 Middleware 01")
 		})
@@ -76,11 +79,13 @@ func initWebServer() *gin.Engine {
 		println("这是我的 Middleware 02")
 	})
 
-	login := &middleware.LoginMiddlewareBuilder{}
-	// 存储数据的，也就是你 userId 存哪里
-	// 直接存 cookie
+	// 创建一个cookie存储，使用"secret"作为密钥
 	store := cookie.NewStore([]byte("secret"))
+	// 使用sessions中间件，将"ssid"作为session的名称，使用store作为存储
+	server.Use(sessions.Sessions("ssid", store))
 
-	server.Use(sessions.Sessions("ssid", store), login.CheckLogin())
+	login := &middleware.LoginMiddlewareBuilder{}
+	server.Use(login.CheckLogin())
+
 	return server
 }

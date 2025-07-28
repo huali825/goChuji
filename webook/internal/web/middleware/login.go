@@ -11,7 +11,6 @@ type LoginMiddlewareBuilder struct {
 
 // CheckLogin 方法用于检查用户是否已经登录
 func (m *LoginMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
-	// 返回一个 gin.HandlerFunc，用于处理请求
 	return func(ctx *gin.Context) {
 		// 获取请求的 URL 路径
 		path := ctx.Request.URL.Path
@@ -20,6 +19,7 @@ func (m *LoginMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 			// 不需要登录校验
 			return
 		}
+
 		// 获取 session
 		sess := sessions.Default(ctx)
 		// 如果 session 中没有 userId，则表示用户未登录

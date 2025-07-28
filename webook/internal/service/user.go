@@ -32,18 +32,25 @@ func (svc *UserService) Signup(ctx context.Context, u domain.User) error {
 	return svc.repo.Create(ctx, u)
 }
 
+// Login 函数用于用户登录，接收一个context.Context、email和password作为参数，返回一个domain.User和一个error
 func (svc *UserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
+	// 根据email查找用户
 	u, err := svc.repo.FindByEmail(ctx, email)
-	if err == repository.ErrUserNotFound {
+	// 如果找不到用户，返回ErrInvalidUserOrPassword错误
+	if errors.Is(err, repository.ErrUserNotFound) {
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
+	// 如果发生其他错误，返回错误
 	if err != nil {
 		return domain.User{}, err
 	}
-	// 检查密码对不对
+
+	// 将用户密码和输入的密码进行比对
 	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+	// 如果比对失败，返回ErrInvalidUserOrPassword错误
 	if err != nil {
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
+	// 返回用户
 	return u, nil
 }
