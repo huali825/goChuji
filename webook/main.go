@@ -1,12 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/redis"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -15,7 +16,6 @@ import (
 	"gochuji/webook/internal/repository/dao"
 	"gochuji/webook/internal/service"
 	"gochuji/webook/internal/web"
-	"gochuji/webook/internal/web/middleware"
 )
 
 func main() {
@@ -57,9 +57,11 @@ func initWebServer() *gin.Engine {
 		cors.New(cors.Config{
 			//AllowAllOrigins:  true,                              //允许所有来源
 			//AllowOrigins:     []string{"http://localhost:3000"}, //允许跨域请求的域名
-			AllowCredentials: true,                     //允许跨域请求携带cookie
-			AllowHeaders:     []string{"Content-Type"}, //允许跨域请求携带的header
+			AllowCredentials: true, //允许跨域请求携带cookie
+			//AllowHeaders:     []string{"Content-Type", "Authorization"}, //允许跨域请求携带的header
+			AllowHeaders: []string{"Content-Type"}, //允许跨域请求携带的header
 			//AllowMethods: []string{"POST"},				//允许跨域请求的方法
+			//ExposeHeaders: []string{"x-jwt-token"},
 
 			//自定义的校验规则
 			AllowOriginFunc: func(origin string) bool {
@@ -79,13 +81,30 @@ func initWebServer() *gin.Engine {
 		println("这是我的 Middleware 02")
 	})
 
-	// 创建一个cookie存储，使用"secret"作为密钥
-	store := cookie.NewStore([]byte("secret"))
-	// 使用sessions中间件，将"ssid"作为session的名称，使用store作为存储
-	server.Use(sessions.Sessions("ssid", store))
+	//// 创建一个cookie存储，使用"secret"作为密钥
+	//store := cookie.NewStore([]byte("secret"))
+	//// 使用sessions中间件，将"ssid"作为session的名称，使用store作为存储
+	//server.Use(sessions.Sessions("ssid", store))
+	//
+	//login := &middleware.LoginMiddlewareBuilder{}
+	//server.Use(login.CheckLogin())
 
-	login := &middleware.LoginMiddlewareBuilder{}
-	server.Use(login.CheckLogin())
+	// 生成32字节随机认证密钥
+	authKey := make([]byte, 32)
+	_, _ = rand.Read(authKey) // 需导入 "crypto/rand" 包
+
+	// 生成16字节随机加密密钥
+	encKey := make([]byte, 16)
+	_, _ = rand.Read(encKey)
+	store, err := redis.NewStore(10,
+		"tcp", "81.71.139.129:6379",
+		"", "qsgctys711!@#",
+		authKey,
+		encKey)
+	if err != nil {
+		panic(err)
+	}
+	server.Use(sessions.Sessions("ssid", store))
 
 	return server
 }
