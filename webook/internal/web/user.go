@@ -242,7 +242,8 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 	// 如果 session 中没有 userId，则表示用户未登录
 	if sess.Get("userId") == nil {
 		// 中断，不要往后执行，也就是不要执行后面的业务逻辑
-		ctx.String(http.StatusOK, "用户未登录")
+		ctx.String(http.StatusUnauthorized, "用户未登录")
+		//ctx.String(http.StatusOK, "用户未登录")
 		return
 	}
 	userIDAnyBtIsInt64 := sess.Get("userId")
