@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gochuji/webook/internal/domain"
 	"gochuji/webook/internal/repository/dao"
+	"time"
 )
 
 var (
@@ -37,6 +38,30 @@ func (repo *UserRepository) FindByEmail(ctx context.Context, email string) (doma
 	return repo.toDomain(u), nil
 }
 
+func (repo *UserRepository) FindByID(ctx *gin.Context, userID int64) (domain.User, error) {
+	u, err := repo.dao.FindByID(ctx, userID)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return repo.toDomain(u), nil
+}
+
+func (repo *UserRepository) UpdateNonZeroFields(ctx context.Context,
+	user domain.User) error {
+	return repo.dao.UpdateById(ctx, repo.toEntity(user))
+}
+
+func (repo *UserRepository) toEntity(u domain.User) dao.User {
+	return dao.User{
+		Id:       u.Id,
+		Email:    u.Email,
+		Password: u.Password,
+		Birthday: u.Birthday.UnixMilli(),
+		AboutMe:  u.AboutMe,
+		Nickname: u.Nickname,
+	}
+}
+
 func (repo *UserRepository) toDomain(u dao.User) domain.User {
 	return domain.User{
 		Id:       u.Id,
@@ -44,23 +69,7 @@ func (repo *UserRepository) toDomain(u dao.User) domain.User {
 		Password: u.Password,
 		Phone:    u.Phone,
 		Nickname: u.Nickname,
-		Birthday: u.Birthday,
+		Birthday: time.UnixMilli(u.Birthday),
 		AboutMe:  u.AboutMe,
 	}
-}
-
-func (repo *UserRepository) FindByID(ctx *gin.Context, userIDStr string) (domain.User, error) {
-	u, err := repo.dao.FindByID(ctx, userIDStr)
-	if err != nil {
-		return domain.User{}, err
-	}
-	return repo.toDomain(u), nil
-}
-
-func (repo *UserRepository) Edit(ctx *gin.Context, userIDStr string, nickname string, birthday string, AboutMe string) (domain.User, error) {
-	u, err := repo.dao.Edit(ctx, userIDStr, nickname, birthday, AboutMe)
-	if err != nil {
-		return domain.User{}, err
-	}
-	return repo.toDomain(u), nil
 }
