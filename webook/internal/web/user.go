@@ -1,11 +1,7 @@
 package web
 
 import (
-	"context"
-	"fmt"
-	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	regexp "github.com/dlclark/regexp2"
@@ -21,6 +17,13 @@ type UserHandler struct {
 	svc         *service.UserService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
+}
+
+var JWTKey = []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgK")
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid int64
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
@@ -50,14 +53,14 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/signup", h.SignUp)
 
 	// POST /users/login
-	ug.POST("/login", h.Login)
-	//ug.POST("/login", h.JWTLogin)
+	//ug.POST("/login", h.Login)
+	ug.POST("/login", h.JWTLogin)
 
 	// POST /users/edit
-	ug.POST("/edit", h.Edit)
+	ug.POST("/edit", h.JWTEdit)
 
 	// GET /users/profile
-	ug.GET("/profile", h.Profile)
+	ug.GET("/profile", h.JWTProfile)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -162,24 +165,38 @@ func (h *UserHandler) JWTLogin(ctx *gin.Context) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	// 声明JWT的Claims结构
-	type Claims struct {
-		Username string `json:"username"`
-		jwt.RegisteredClaims
-	}
 
 	var req Req
 	if err := ctx.Bind(&req); err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	_, err := h.svc.Login(ctx, req.Email, req.Password)
+	u, err := h.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		//jwt登录实现
-		context.TODO()
 
+		// 创建一个JWT中间件，用于登录验证
+		uc := UserClaims{
+			// 设置用户ID
+			Uid: u.Id,
+			// 设置注册声明，包括过期时间
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+			},
+		}
+		// 使用HS512算法生成JWT
+		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+		// 使用密钥对JWT进行签名
+		tokenStr, err := token.SignedString(JWTKey)
+		// 如果签名失败，返回系统错误
+		if err != nil {
+			ctx.String(http.StatusOK, "系统错误")
+		}
+		// ■ ■ 将JWT添加到响应头中
+		ctx.Header("x-jwt-token", tokenStr)
+		// 返回登录成功
 		ctx.String(http.StatusOK, "登录成功")
+
 	case service.ErrInvalidUserOrPassword:
 		ctx.String(http.StatusOK, "用户名或者密码不对")
 	default:
@@ -187,32 +204,8 @@ func (h *UserHandler) JWTLogin(ctx *gin.Context) {
 	}
 }
 
-func (h *UserHandler) Edit(ctx *gin.Context) {
+func (h *UserHandler) JWTEdit(ctx *gin.Context) {
 	//{"nickname":"huali","birthday":"2025-07-28","aboutMe":"sdfsfdfsfdfsdghhhh"}
-	sess := sessions.Default(ctx)
-	// 如果 session 中没有 userId，则表示用户未登录
-	if sess.Get("userId") == nil {
-		// 中断，不要往后执行，也就是不要执行后面的业务逻辑
-		ctx.String(http.StatusOK, "用户未登录")
-		return
-	}
-	userIDAnyBtIsInt64 := sess.Get("userId")
-
-	// 从上下文中获取用户ID
-	//userID, exists := ctx.Get("user_id")
-	//if !exists {
-	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": "无法获取用户信息"})
-	//	return
-	//}
-
-	userIDInt64, ok := userIDAnyBtIsInt64.(int64)
-	if !ok {
-		// 处理类型不匹配的情况
-		ctx.String(http.StatusOK, "系统错误")
-		log.Fatal("类型断言失败：puserID2 不是 int64 类型")
-	}
-	userIDStr := strconv.FormatInt(userIDInt64, 10)
-
 	//处理传入的json
 	type Req struct {
 		Nickname string `json:"nickname"`
@@ -225,55 +218,53 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 		return
 	}
 
-	u, err := h.svc.Edit(ctx, userIDStr, req.Nickname, req.Birthday, req.AboutMe)
-	fmt.Println(u, time.Now())
-	switch err {
-	case nil:
-		ctx.String(http.StatusOK, "")
-	default:
-		ctx.String(http.StatusOK, "系统错误")
+	uc, ok := ctx.MustGet("user").(UserClaims)
+	if !ok {
+		//ctx.String(http.StatusOK, "系统错误")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	birthday, err := time.Parse(time.DateOnly, req.Birthday)
+	if err != nil {
+		//ctx.String(http.StatusOK, "系统错误")
+		ctx.String(http.StatusOK, "生日格式不对")
+		return
+	}
+
+	err = h.svc.UpdateNonSensitiveInfo(ctx, domain.User{
+		Id:       uc.Uid,
+		Nickname: req.Nickname,
+		Birthday: birthday,
+		AboutMe:  req.AboutMe,
+	})
+	if err != nil {
+		ctx.String(http.StatusOK, "系统异常")
+		return
 	}
 }
 
-func (h *UserHandler) Profile(ctx *gin.Context) {
+func (h *UserHandler) JWTProfile(ctx *gin.Context) {
 
-	// 获取 session
-	sess := sessions.Default(ctx)
-	// 如果 session 中没有 userId，则表示用户未登录
-	if sess.Get("userId") == nil {
-		// 中断，不要往后执行，也就是不要执行后面的业务逻辑
-		ctx.String(http.StatusUnauthorized, "用户未登录")
-		//ctx.String(http.StatusOK, "用户未登录")
+	uc, ok := ctx.MustGet("user").(UserClaims)
+	if !ok {
+		//ctx.String(http.StatusOK, "系统错误")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	userIDAnyBtIsInt64 := sess.Get("userId")
-
-	// 从上下文中获取用户ID
-	//userID, exists := ctx.Get("user_id")
-	//if !exists {
-	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": "无法获取用户信息"})
-	//	return
-	//}
-
-	userIDInt64, ok := userIDAnyBtIsInt64.(int64)
-	if !ok {
-		// 处理类型不匹配的情况
-		ctx.String(http.StatusOK, "系统错误")
-		log.Fatal("类型断言失败：puserID2 不是 int64 类型")
-	}
-	userIDStr := strconv.FormatInt(userIDInt64, 10)
 
 	// 从数据库获取用户信息
-	u, err := h.svc.FindByID(ctx, userIDStr)
+	u, err := h.svc.FindByID(ctx, uc.Uid)
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "无法获取用户信息")
+		ctx.String(http.StatusOK, "系统异常")
 	}
 
 	profile := &Profile{
 		Email:    u.Email,
 		Phone:    u.Phone,
 		Nickname: u.Nickname,
-		Birthday: u.Birthday,
+		//
+		Birthday: u.Birthday.Format(time.DateOnly),
 		AboutMe:  u.AboutMe,
 	}
 

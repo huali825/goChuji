@@ -30,12 +30,12 @@ instance.interceptors.response.use(function (resp) {
 })
 //
 // 在这里让每一个请求都加上 authorization 的头部
-// instance.interceptors.request.use((req) => {
-//     const token = localStorage.getItem("token")
-//     req.headers.setAuthorization("Bearer " + token, true)
-//     return req
-// }, (err) => {
-//     console.log(err)
-// })
+instance.interceptors.request.use((req) => {
+    const token = localStorage.getItem("token")
+    req.headers.setAuthorization("Bearer " + token, true)
+    return req
+}, (err) => {
+    console.log(err)
+})
 
 export default instance

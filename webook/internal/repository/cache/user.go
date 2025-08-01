@@ -11,7 +11,7 @@ import (
 	"gochuji/webook/internal/domain"
 )
 
-var ErrKeyNotExist = redis.Nil
+var ErrKeyNotExist = redis.Nil // 错误， key 不存在
 
 type UserCache struct {
 	cmd        redis.Cmdable
