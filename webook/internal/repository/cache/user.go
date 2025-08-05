@@ -11,11 +11,16 @@ import (
 	"gochuji/webook/internal/domain"
 )
 
-var ErrKeyNotExist = redis.Nil // 错误， key 不存在
-
 type UserCache struct {
 	cmd        redis.Cmdable
 	expiration time.Duration
+}
+
+func NewUserCache(cmd redis.Cmdable) *UserCache {
+	return &UserCache{
+		cmd:        cmd,
+		expiration: time.Minute * 15,
+	}
 }
 
 func (c *UserCache) Get(ctx context.Context, uid int64) (domain.User, error) {
@@ -50,17 +55,6 @@ func (c *UserCache) key(uid int64) string {
 	// user/info/
 	// user_info_
 	return fmt.Sprintf("user:info:%d", uid)
-}
-
-type UserCacheV1 struct {
-	client *redis.Client
-}
-
-func NewUserCache(cmd redis.Cmdable) *UserCache {
-	return &UserCache{
-		cmd:        cmd,
-		expiration: time.Minute * 15,
-	}
 }
 
 // 一定不要自己去初始化你需要的东西，让外面传进来

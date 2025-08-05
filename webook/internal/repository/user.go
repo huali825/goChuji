@@ -4,7 +4,9 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"gochuji/webook/internal/domain"
+	"gochuji/webook/internal/repository/cache"
 	"gochuji/webook/internal/repository/dao"
+	"log"
 	"time"
 )
 
@@ -14,12 +16,14 @@ var (
 )
 
 type UserRepository struct {
-	dao *dao.UserDAO
+	dao   *dao.UserDAO
+	cache *cache.UserCache
 }
 
-func NewUserRepository(dao *dao.UserDAO) *UserRepository {
+func NewUserRepository(dao *dao.UserDAO, c *cache.UserCache) *UserRepository {
 	return &UserRepository{
-		dao: dao,
+		dao:   dao,
+		cache: c,
 	}
 }
 
@@ -39,16 +43,38 @@ func (repo *UserRepository) FindByEmail(ctx context.Context, email string) (doma
 }
 
 func (repo *UserRepository) FindByID(ctx *gin.Context, userID int64) (domain.User, error) {
+	du, err := repo.cache.Get(ctx, userID)
+	// 只要 err 为 nil，就返回
+	if err == nil {
+		return du, nil
+	}
+
 	u, err := repo.dao.FindByID(ctx, userID)
 	if err != nil {
 		return domain.User{}, err
 	}
-	return repo.toDomain(u), nil
+	du = repo.toDomain(u)
+
+	err = repo.cache.Set(ctx, du)
+	if err != nil {
+		// 网络崩了，也可能是 redis 崩了
+		log.Println(err)
+	}
+	return du, nil
 }
 
 func (repo *UserRepository) UpdateNonZeroFields(ctx context.Context,
 	user domain.User) error {
-	return repo.dao.UpdateById(ctx, repo.toEntity(user))
+	err := repo.dao.UpdateById(ctx, repo.toEntity(user))
+	if err != nil {
+		return err
+	}
+	err = repo.cache.Set(ctx, user)
+	if err != nil {
+		// 网络崩了，也可能是 redis 崩了
+		log.Println(err)
+	}
+	return err
 }
 
 func (repo *UserRepository) toEntity(u domain.User) dao.User {

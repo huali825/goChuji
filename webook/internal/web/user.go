@@ -218,6 +218,7 @@ func (h *UserHandler) JWTEdit(ctx *gin.Context) {
 		return
 	}
 
+	//
 	uc, ok := ctx.MustGet("user").(UserClaims)
 	if !ok {
 		//ctx.String(http.StatusOK, "系统错误")
@@ -242,6 +243,7 @@ func (h *UserHandler) JWTEdit(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统异常")
 		return
 	}
+	ctx.String(http.StatusOK, "更新成功")
 }
 
 func (h *UserHandler) JWTProfile(ctx *gin.Context) {

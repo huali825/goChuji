@@ -1,28 +1,37 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
-	"github.com/gin-contrib/sessions/redis"
-	"gochuji/webook/internal/web/middleware"
+	"fmt"
+
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	sredis "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
 	"gochuji/webook/internal/repository"
+	"gochuji/webook/internal/repository/cache"
 	"gochuji/webook/internal/repository/dao"
 	"gochuji/webook/internal/service"
 	"gochuji/webook/internal/web"
+	"gochuji/webook/internal/web/middleware"
 )
 
 func main() {
 	db := initDB()
+	rdb, err := initRedis("81.71.139.129:6379", "qsgctys711!@#", 0)
+	if err != nil {
+		panic(err)
+	}
 	server := initWebServer()
-	initUserHdl(db, server)
-	err := server.Run(":8080")
+	initUserHdl(db, rdb, server)
+	err = server.Run(":8080")
 	if err != nil {
 		panic(err)
 	}
@@ -42,9 +51,10 @@ func initDB() *gorm.DB {
 	return db
 }
 
-func initUserHdl(db *gorm.DB, server *gin.Engine) {
+func initUserHdl(db *gorm.DB, rdb redis.Cmdable, server *gin.Engine) {
 	ud := dao.NewUserDAO(db)
-	ur := repository.NewUserRepository(ud)
+	uredis := cache.NewUserCache(rdb)
+	ur := repository.NewUserRepository(ud, uredis)
 	us := service.NewUserService(ur)
 	hdl := web.NewUserHandler(us)
 	hdl.RegisterRoutes(server)
@@ -101,8 +111,24 @@ func initWebServer() *gin.Engine {
 	return server
 }
 
+func initRedis(addr, password string, db int) (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: password,
+		DB:       db,
+	})
+
+	// 测试连接
+	_, err := client.Ping(context.Background()).Result()
+	if err != nil {
+		return nil, fmt.Errorf("无法连接到Redis: %v", err)
+	}
+
+	return client, nil
+}
+
 // sessionStore 函数用于生成一个redis.Store对象
-func sessionStore() redis.Store {
+func sessionStore() sredis.Store {
 	// 生成32字节随机认证密钥
 	authKey := make([]byte, 32)
 	_, _ = rand.Read(authKey) // 需导入 "crypto/rand" 包
@@ -111,7 +137,7 @@ func sessionStore() redis.Store {
 	_, _ = rand.Read(encKey)
 
 	// 创建一个redis.Store对象，参数分别为：最大连接数、地址、密码、认证密钥、加密密钥
-	store, err := redis.NewStore(10,
+	store, err := sredis.NewStore(10,
 		"tcp", "81.71.139.129:6379",
 		"", "qsgctys711!@#",
 		authKey,
